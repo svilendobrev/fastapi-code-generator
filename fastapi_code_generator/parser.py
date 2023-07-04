@@ -25,9 +25,10 @@ from datamodel_code_generator import (
     LiteralType,
     OpenAPIScope,
     PythonVersion,
-    cached_property,
     snooper_to_methods,
 )
+try: from datamodel_code_generator.util import cached_property  #v0.21
+except: from datamodel_code_generator import cached_property    #v0.16
 from datamodel_code_generator.imports import Import, Imports
 from datamodel_code_generator.model import DataModel, DataModelFieldBase
 from datamodel_code_generator.model import pydantic as pydantic_model
