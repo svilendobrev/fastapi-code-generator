@@ -45,7 +45,11 @@ def main(
 #    custom_visitors: Optional[List[Path]] = typer.Option( None, "--custom-visitor", "-c"),
 #    disable_timestamp: bool = typer.Option(False, "--disable-timestamp"),
 ) -> None:
-    ap = ArgumentParser()
+    #from datamodel_code_generator.__main__ import arg_parser as dcg_ap
+    #dcg_ap.add_help=False
+    #TODO.. group/separate dcg_ap.argz, remove irrelevant like --input etc
+    ap = ArgumentParser() # parents= [ dcg_ap ], conflict_handler= 'resolve')
+
     def argany( name, *short, **ka):
         return ap.add_argument( dest=name, *(list(short)+['--'+name.replace('_','-')] ), **ka)
     argtext = argany
