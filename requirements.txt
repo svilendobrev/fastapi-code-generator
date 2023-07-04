@@ -1,7 +1,7 @@
 datamodel-code-generator[http] @ git+https://github.com/svilendobrev/datamodel-code-generator
 stringcase
-PySnooper
+##PySnooper
 jinja2
 pydantic==1.*
-typed-ast
+##typed-ast
 
