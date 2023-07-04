@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from argparse import ArgumentParser
 
-import typer
 from datamodel_code_generator import LiteralType, PythonVersion, chdir
 from datamodel_code_generator.format import CodeFormatter
 from datamodel_code_generator.imports import Import, Imports
@@ -15,18 +15,11 @@ from jinja2 import Environment, FileSystemLoader
 from fastapi_code_generator.parser import OpenAPIParser
 from fastapi_code_generator.visitor import Visitor
 
-app = typer.Typer()
-
-all_tags = []
 
 TITLE_PATTERN = re.compile(r'(?<!^)(?<![A-Z ])(?=[A-Z])| ')
-
 BUILTIN_MODULAR_TEMPLATE_DIR = Path(__file__).parent / "modular_template"
-
 BUILTIN_TEMPLATE_DIR = Path(__file__).parent / "template"
-
 BUILTIN_VISITOR_DIR = Path(__file__).parent / "visitors"
-
 MODEL_PATH: Path = Path("models.py")
 
 
@@ -41,52 +34,47 @@ def dynamic_load_module(module_path: Path) -> Any:
     raise Exception(f"{module_name} can not be loaded")
 
 
-@app.command()
 def main(
-    input_file: typer.FileText = typer.Option(..., "--input", "-i"),
-    output_dir: Path = typer.Option(..., "--output", "-o"),
-    model_file: str = typer.Option(None, "--model-file", "-m"),
-    template_dir: Optional[Path] = typer.Option(None, "--template-dir", "-t"),
-    enum_field_as_literal: Optional[LiteralType] = typer.Option(
-        None, "--enum-field-as-literal"
-    ),
-    generate_routers: bool = typer.Option(False, "--generate-routers", "-r"),
-    specify_tags: Optional[str] = typer.Option(None, "--specify-tags"),
-    custom_visitors: Optional[List[Path]] = typer.Option(
-        None, "--custom-visitor", "-c"
-    ),
-    disable_timestamp: bool = typer.Option(False, "--disable-timestamp"),
+#    input_file: typer.FileText = typer.Option(..., "--input", "-i"),
+#    output_dir: Path = typer.Option(..., "--output", "-o"),
+#    model_file: str = typer.Option(None, "--model-file", "-m"),
+#    template_dir: Optional[Path] = typer.Option(None, "--template-dir", "-t"),
+#    enum_field_as_literal: Optional[LiteralType] = typer.Option( None, "--enum-field-as-literal"),
+#    generate_routers: bool = typer.Option(False, "--generate-routers", "-r"),
+#    specify_tags: Optional[str] = typer.Option(None, "--specify-tags"),
+#    custom_visitors: Optional[List[Path]] = typer.Option( None, "--custom-visitor", "-c"),
+#    disable_timestamp: bool = typer.Option(False, "--disable-timestamp"),
 ) -> None:
-    input_name: str = input_file.name
-    input_text: str = input_file.read()
-    if model_file:
-        model_path = Path(model_file).with_suffix('.py')
-    else:
-        model_path = MODEL_PATH
+    ap = ArgumentParser()
+    def argany( name, *short, **ka):
+        return ap.add_argument( dest=name, *(list(short)+['--'+name.replace('_','-')] ), **ka)
+    argtext = argany
+    def argpath( name, *short, **ka):
+        return argany( name, type=Path, *short,**ka)
+    def argbool( name, *short, **ka):
+        return argany( name, action='store_true', *short,**ka)
+    argpath( 'input_file', '-i', required=True )    #Path
+    argpath( 'output_dir', '-o', required=True )    #Path
+    argtext( 'model_file', '-m', default= MODEL_PATH )
+    argpath( 'template_dir', '-t')   #Optional[Path]
+    argtext( 'enum_field_as_literal', choices = list( v.value for v in LiteralType )) # Optional[LiteralType]
+    argbool( 'generate_routers', '-r')
+    argtext( 'specify_tags')
+    argpath( 'custom_visitor', '-c', action='append' )
+    argbool( 'disable_timestamp')
+    argz = ap.parse_args()
 
-    if enum_field_as_literal:
-        return generate_code(
-            input_name,
-            input_text,
-            output_dir,
-            template_dir,
-            model_path,
-            enum_field_as_literal,
-            custom_visitors=custom_visitors,
-            disable_timestamp=disable_timestamp,
-            generate_routers=generate_routers,
-            specify_tags=specify_tags,
-        )
     return generate_code(
-        input_name,
-        input_text,
-        output_dir,
-        template_dir,
-        model_path,
-        custom_visitors=custom_visitors,
-        disable_timestamp=disable_timestamp,
-        generate_routers=generate_routers,
-        specify_tags=specify_tags,
+        input_name              = argz.input_file,
+        input_text              = open( argz.input_file ).read(),
+        output_dir              = argz.output_dir,
+        template_dir            = argz.template_dir,
+        model_path              = argz.model_file and Path( argz.model_file ).with_suffix('.py'),
+        custom_visitors         = argz.custom_visitor or (),
+        disable_timestamp       = argz.disable_timestamp,
+        generate_routers        = argz.generate_routers,
+        specify_tags            = argz.specify_tags,
+        enum_field_as_literal   = argz.enum_field_as_literal and LiteralType( argz.enum_field_as_literal ),
     )
 
 
@@ -114,17 +102,13 @@ def generate_code(
 ) -> None:
     if not model_path:
         model_path = MODEL_PATH
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     if generate_routers:
         template_dir = BUILTIN_MODULAR_TEMPLATE_DIR
         Path(output_dir / "routers").mkdir(parents=True, exist_ok=True)
     if not template_dir:
         template_dir = BUILTIN_TEMPLATE_DIR
-    if enum_field_as_literal:
-        parser = OpenAPIParser(input_text, enum_field_as_literal=enum_field_as_literal)
-    else:
-        parser = OpenAPIParser(input_text)
+    parser = OpenAPIParser(input_text, enum_field_as_literal=enum_field_as_literal)
     with chdir(output_dir):
         models = parser.parse()
     if not models:
@@ -135,7 +119,7 @@ def generate_code(
     else:
         raise Exception('Modular references are not supported in this version')
 
-    environment: Environment = Environment(
+    environment = Environment(
         loader=FileSystemLoader(
             template_dir if template_dir else f"{Path(__file__).parent}/template",
             encoding="utf8",
@@ -145,36 +129,34 @@ def generate_code(
     results: Dict[Path, str] = {}
     code_formatter = CodeFormatter(PythonVersion.PY_38, Path().resolve())
 
-    template_vars: Dict[str, object] = {"info": parser.parse_info()}
-    visitors: List[Visitor] = []
+    template_vars = {"info": parser.parse_info()}
+    visitors = []
 
     # Load visitors
     builtin_visitors = BUILTIN_VISITOR_DIR.rglob("*.py")
-    visitors_path = [*builtin_visitors, *(custom_visitors if custom_visitors else [])]
+    visitors_path = [*builtin_visitors, *custom_visitors]
     for visitor_path in visitors_path:
         module = dynamic_load_module(visitor_path)
-        if hasattr(module, "visit"):
+        try:
             visitors.append(module.visit)
-        else:
-            raise Exception(f"{visitor_path.stem} does not have any visit function")
+        except AttributeError:
+            raise RuntimeError(f"{visitor_path.stem} does not have any visit function")
 
     # Call visitors to build template_vars
     for visitor in visitors:
-        visitor_result = visitor(parser, model_path)
-        template_vars = {**template_vars, **visitor_result}
+        template_vars.update( visitor(parser, model_path))
 
+    all_tags = []
     if generate_routers:
-        operations: Any = template_vars.get("operations", [])
-        for operation in operations:
-            if hasattr(operation, "tags"):
-                for tag in operation.tags:
-                    all_tags.append(tag)
+        for operation in template_vars.get("operations", ()):
+            all_tags += getattr( operation, 'tags', ())
+
     # Convert from Tag Names to router_names
     sorted_tags = sorted(set(all_tags))
     routers = sorted(
-        [re.sub(TITLE_PATTERN, '_', tag.strip()).lower() for tag in sorted_tags]
+        re.sub(TITLE_PATTERN, '_', tag.strip()).lower() for tag in sorted_tags
     )
-    template_vars = {**template_vars, "routers": routers, "tags": sorted_tags}
+    template_vars.update( routers=routers, tags=sorted_tags)
 
     for target in template_dir.rglob("*"):
         relative_path = target.relative_to(template_dir)
@@ -228,23 +210,24 @@ def generate_code(
     if not disable_timestamp:
         header += f'\n#   timestamp: {timestamp}'
 
+    class wither:
+        'empty context for with operator - i.e. with (somefile or wither): ...'
+        def __enter__(*a,**k): pass
+        def __exit__(*a,**k): pass
+    wither=wither()
+
     for path, body_and_filename in modules.items():
         body, filename = body_and_filename
-        if path is None:
-            file = None
-        else:
-            if not path.parent.exists():
-                path.parent.mkdir(parents=True)
-            file = path.open('wt', encoding='utf8')
-
-        print(header.format(filename=filename), file=file)
-        if body:
-            print('', file=file)
-            print(body.rstrip(), file=file)
-
-        if file is not None:
-            file.close()
+        if path:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        with ( path.open('wt', encoding='utf8') if path else wither) as file:
+            print(header.format(filename=filename), file=file)
+            if body:
+                print('', file=file)
+                print(body.rstrip(), file=file)
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    main()
+
+# vim:ts=4:sw=4:expandtab
