@@ -232,7 +232,10 @@ class OpenAPIParser(OpenAPIModelParser):
             custom_class_name_generator=custom_class_name_generator,
             field_extra_keys=field_extra_keys,
             field_include_all_keys=field_include_all_keys,
-            openapi_scopes=[OpenAPIScope.Schemas, OpenAPIScope.Paths],
+            openapi_scopes=[
+                OpenAPIScope.Schemas, OpenAPIScope.Paths,
+                OpenAPIScope.Tags, OpenAPIScope.Parameters,     #maybe not needed ???
+                ],
             use_default_kwarg=True,
         )
         self.operations: Dict[str, Operation] = {}
@@ -248,9 +251,16 @@ class OpenAPIParser(OpenAPIModelParser):
         return result or None
 
     def parse_parameters(self, parameters: ParameterObject, path: List[str]) -> None:
+        #datamodel_code_generator==0.16
         super().parse_parameters(parameters, path)
         self._temporary_operation['_parameters'].append(parameters)
+    def parse_all_parameters(self, name, parameters, *a,**ka):
+        #datamodel_code_generator==0.21
+        super().parse_all_parameters( name, parameters, *a,**ka)
+        self._temporary_operation['_parameters'] = parameters
 
+    NAMESUFFIX_FOR_PYTHON_RESERVED_WORDS = '_PY'
+    PYTHON_RESERVED_WORDS = 'class def from yield in for while break if else continue return not import as'.split()     #etc get from somewhere??
     def get_parameter_type(
         self,
         parameters: ParameterObject,
@@ -262,6 +272,9 @@ class OpenAPIParser(OpenAPIModelParser):
             name = stringcase.snakecase(parameters.name)
         else:
             name = parameters.name
+
+        if orig_name in self.PYTHON_RESERVED_WORDS:
+            name = orig_name + self.NAMESUFFIX_FOR_PYTHON_RESERVED_WORDS
 
         schema: Optional[JsonSchemaObject] = None
         data_type: Optional[DataType] = None
@@ -286,17 +299,22 @@ class OpenAPIParser(OpenAPIModelParser):
             required=parameters.required or parameters.in_ == ParameterLocation.path,
         )
 
-        if orig_name != name:
+        if orig_name != name or schema.description:
             if parameters.in_:
-                param_is = parameters.in_.value.lower().capitalize()
+                param_is = parameters.in_.value.lower().capitalize()    #this should be via dict/mapping
                 self.imports_for_fastapi.append(
                     Import(from_='fastapi', import_=param_is)
                 )
-                default: Optional[
-                    str
-                ] = f"{param_is}({'...' if field.required else repr(schema.default)}, alias='{orig_name}')"
+                default = f"{param_is}("
+                default += '...' if field.required else repr(schema.default)
+                if orig_name != name:
+                    default += f", alias='{orig_name}'"
+                if schema.description:
+                    default += f", description='{schema.description}'"
+                default += ")"
         else:
             default = repr(schema.default) if schema.has_default else None
+
         self.imports_for_fastapi.append(field.imports)
         self.data_types.append(field.data_type)
         return Argument(

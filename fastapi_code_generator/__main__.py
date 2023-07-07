@@ -193,7 +193,10 @@ def generate_code(
                     template = environment.get_template(str(relative_path))
                     result = template.render(template_vars)
                     router_path = Path("routers", router).with_suffix(".jinja2")
-                    results[router_path] = code_formatter.format_code(result)
+                    if 10:
+                        results[router_path] = code_formatter.format_code(result)
+                    else:
+                        results[router_path] = result
 
     timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     header = f"""\

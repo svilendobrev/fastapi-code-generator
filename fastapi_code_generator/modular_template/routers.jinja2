@@ -22,9 +22,12 @@ router = APIRouter(
             {% endfor %}
         }
     {% endif %}
+	{# these duplicate the tags in router above -> fastapi tags are list not set -> redoc etc duplicates the methods
     {% if operation.tags%}
     , tags={{operation.tags}}
-    {% endif %})
+    {% endif %}
+	#}
+	)
 def {{operation.function_name}}({{operation.snake_case_arguments}}) -> {{operation.return_type}}:
     {%- if operation.summary %}
     """
