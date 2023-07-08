@@ -1,4 +1,4 @@
-datamodel-code-generator[http] @ git+https://github.com/svilendobrev/datamodel-code-generator
+#datamodel-code-generator[http] @ git+https://github.com/svilendobrev/datamodel-code-generator
 stringcase
 ##PySnooper
 jinja2
