@@ -267,12 +267,13 @@ class OpenAPIParser(OpenAPIModelParser):
         snake_case: bool,
         path: List[str],
     ) -> Optional[Argument]:
-        orig_name = parameters.name
+        #svd XXX aliases are not supported in oaspec as such.
+        #so, having /op/{path_arg} but parameters: { name: 'pathArg' } cannot be related -> Semantic error/omission
+        #Query.alias works as shows/uses only the alias, but Path.alias uses both hence breaks
+        orig_name = name = parameters.name
         if snake_case:
             name = stringcase.snakecase(parameters.name)
-        else:
-            name = parameters.name
-
+        #if orig_name != name: print( 1111, orig_name, name, parameters)
         if orig_name in self.PYTHON_RESERVED_WORDS:
             name = orig_name + self.NAMESUFFIX_FOR_PYTHON_RESERVED_WORDS
 
@@ -307,11 +308,12 @@ class OpenAPIParser(OpenAPIModelParser):
                 )
                 default = f"{param_is}("
                 default += '...' if field.required else repr(schema.default)
-                if orig_name != name:
+                if orig_name != name and param_is != 'Path':    #XXX see above about aliasing
                     default += f", alias='{orig_name}'"
                 if schema.description:
                     default += f", description='{schema.description}'"
                 default += ")"
+                #print( 22222, default)
         else:
             default = repr(schema.default) if schema.has_default else None
 
