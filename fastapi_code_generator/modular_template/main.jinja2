@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from .routers import {{ routers | join(", ") }}
+root_tags = {{openapi_tags}}
 
 app = FastAPI(
     {% if info %}
@@ -11,6 +12,7 @@ app = FastAPI(
     {{ key }} = {{info_value}},
     {% endfor %}
     {% endif %}
+	openapi_tags = root_tags
     )
 
 {% for router in routers -%}

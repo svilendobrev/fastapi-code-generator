@@ -162,6 +162,10 @@ def generate_code(
     )
     template_vars.update( routers=routers, tags=sorted_tags)
 
+    template_vars.update( openapi_tags = parser.openapi_tags)
+    unknown_root_tags = set( t['name'] for t in parser.openapi_tags) - set( all_tags)
+    assert not unknown_root_tags, unknown_root_tags     #declared in root but not inside the operations
+
     for target in template_dir.rglob("*"):
         relative_path = target.relative_to(template_dir)
         template = environment.get_template(str(relative_path))
