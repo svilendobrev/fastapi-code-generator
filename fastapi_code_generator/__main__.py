@@ -4,6 +4,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from argparse import ArgumentParser
+from warnings import warn
 
 from datamodel_code_generator import LiteralType, PythonVersion, chdir
 from datamodel_code_generator.format import CodeFormatter
@@ -164,7 +165,8 @@ def generate_code(
 
     template_vars.update( openapi_tags = parser.openapi_tags)
     unknown_root_tags = set( t['name'] for t in parser.openapi_tags) - set( all_tags)
-    assert not unknown_root_tags, unknown_root_tags     #declared in root but not inside the operations
+    if unknown_root_tags:
+        warn( f'tags declared at root but not in operations: {unknown_root_tags}')
 
     for target in template_dir.rglob("*"):
         relative_path = target.relative_to(template_dir)
