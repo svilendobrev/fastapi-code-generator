@@ -11,6 +11,13 @@ router = APIRouter(
 {% for operation in operations %}
 {% if operation.tags[0] == tag %}
 @router.{{operation.type}}('{{operation.snake_case_path}}', response_model={{operation.response}}
+    {% if operation.summary %}
+        , summary='{{operation.summary}}'
+    {% endif %}
+    {#{% if operation.description %}
+        , description='{{operation.description}}'
+      {% endif %} 
+    #}
     {% if operation.additional_responses %}
         , responses={
             {% for status_code, models in operation.additional_responses.items() %}
@@ -22,18 +29,20 @@ router = APIRouter(
             {% endfor %}
         }
     {% endif %}
-	{# these duplicate the tags in router above -> fastapi tags are list not set -> redoc etc duplicates the methods
+    {# these duplicate the tags in router above -> fastapi tags are list not set -> redoc etc duplicates the methods
     {% if operation.tags%}
     , tags={{operation.tags}}
     {% endif %}
-	#}
-	)
+    #}
+    )
 def {{operation.function_name}}({{operation.snake_case_arguments}}) -> {{operation.return_type}}:
-    {%- if operation.summary %}
+    {%- if operation.description %} {# XXX fastapi makes .description from here, ignoring .description above #}
     """
-    {{ operation.summary }}
+    {{ operation.description }}
     """
     {%- endif %}
     pass
 {% endif %}
 {% endfor %}
+
+# vim:ts=4:sw=4:expandtab
